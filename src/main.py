@@ -5,15 +5,15 @@ import os
 
 app = FastAPI()
 
-# SET YOUR STRIPE KEY HERE
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# Temporary in-memory store
 pending_vends = []
+
 
 @app.get("/")
 async def root():
     return {"status": "vendplay cloud running"}
+
 
 @app.get("/buy")
 async def buy():
@@ -31,7 +31,18 @@ async def buy():
         success_url=os.getenv("BASE_URL") + "/success",
         cancel_url=os.getenv("BASE_URL") + "/cancel",
     )
-return RedirectResponse(session.url, status_code=303)
+    return RedirectResponse(session.url, status_code=303)
+
+
+@app.get("/success")
+async def success():
+    return {"status": "payment success"}
+
+
+@app.get("/cancel")
+async def cancel():
+    return {"status": "payment cancelled"}
+
 
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
@@ -47,6 +58,7 @@ async def stripe_webhook(request: Request):
         pending_vends.append({"status": "pending"})
 
     return {"received": True}
+
 
 @app.get("/next-vend")
 async def next_vend():
