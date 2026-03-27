@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 import stripe
 import os
 
@@ -30,7 +31,7 @@ async def buy():
         success_url=os.getenv("BASE_URL") + "/success",
         cancel_url=os.getenv("BASE_URL") + "/cancel",
     )
-    return {"url": session.url}
+return RedirectResponse(session.url, status_code=303)
 
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
