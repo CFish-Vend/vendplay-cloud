@@ -199,20 +199,18 @@ async def stripe_webhook(request: Request):
         payload, sig_header, endpoint_secret
     )
 
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
+if event["type"] == "checkout.session.completed":
+    session = event["data"]["object"]
 
-        raw_metadata = session.metadata if hasattr(session, "metadata") else {}
+    # SAFE metadata extraction
+    try:
+        table_name = session.metadata["table_name"]
+    except Exception:
+        table_name = "Table 1"
 
-        if hasattr(raw_metadata, "to_dict_recursive"):
-            metadata = raw_metadata.to_dict_recursive()
-        else:
-            metadata = dict(raw_metadata) if raw_metadata else {}
+    queue_vend(table_name)
+    add_audit(
 
-        table_name = metadata.get("table_name", "Table 1")
-
-        queue_vend(table_name)
-        add_audit(
             source="online_payment",
             table=table_name,
             status="completed",
