@@ -12,6 +12,18 @@ pending_vends = []
 audit_log = []
 
 
+def add_audit(source: str, table: str = "Table 1", status: str = "completed", amount_cents: int = 0):
+    record = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "source": source,
+        "table": table,
+        "status": status,
+        "amount_cents": amount_cents,
+    }
+    audit_log.append(record)
+    return record
+
+
 @app.get("/")
 async def root():
     return {"status": "vendplay cloud running"}
@@ -58,12 +70,12 @@ async def stripe_webhook(request: Request):
 
     if event["type"] == "checkout.session.completed":
         pending_vends.append({"status": "pending"})
-        audit_log.append({
-            "timestamp": datetime.utcnow().isoformat(),
-            "source": "online_payment",
-            "table": "Table 1",
-            "status": "completed"
-        })
+        add_audit(
+            source="online_payment",
+            table="Table 1",
+            status="completed",
+            amount_cents=200,
+        )
 
     return {"received": True}
 
@@ -77,16 +89,68 @@ async def next_vend():
 
 @app.post("/log-manual-vend")
 async def log_manual_vend():
-    record = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "source": "manual_switch",
-        "table": "Table 1",
-        "status": "completed"
-    }
-    audit_log.append(record)
+    record = add_audit(
+        source="manual_switch",
+        table="Table 1",
+        status="completed",
+        amount_cents=200,
+    )
     return {"logged": True, "record": record}
 
 
 @app.get("/audits")
 async def audits():
     return audit_log
+
+
+@app.get("/audits/summary")
+async def audits_summary():
+    total_count = len(audit_log)
+    total_amount_cents = sum(r.get("amount_cents", 0) for r in audit_log)
+
+    by_source = {}
+    by_table = {}
+
+    for r in audit_log:
+        source = r.get("source", "unknown")
+        table = r.get("table", "unknown")
+        amount = r.get("amount_cents", 0)
+
+        if source not in by_source:
+            by_source[source] = {
+                "count": 0,
+                "amount_cents": 0,
+            }
+        by_source[source]["count"] += 1
+        by_source[source]["amount_cents"] += amount
+
+        if table not in by_table:
+            by_table[table] = {
+                "count": 0,
+                "amount_cents": 0,
+            }
+        by_table[table]["count"] += 1
+        by_table[table]["amount_cents"] += amount
+
+    return {
+        "total_transactions": total_count,
+        "total_amount_cents": total_amount_cents,
+        "total_amount_dollars": round(total_amount_cents / 100, 2),
+        "by_source": by_source,
+        "by_table": by_table,
+    }
+
+
+@app.get("/audits/table/{table_name}")
+async def audits_by_table(table_name: str):
+    records = [r for r in audit_log if r.get("table") == table_name]
+
+    total_amount_cents = sum(r.get("amount_cents", 0) for r in records)
+
+    return {
+        "table": table_name,
+        "transaction_count": len(records),
+        "total_amount_cents": total_amount_cents,
+        "total_amount_dollars": round(total_amount_cents / 100, 2),
+        "transactions": records,
+    }
