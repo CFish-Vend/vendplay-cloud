@@ -2,12 +2,14 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 import stripe
 import os
+from datetime import datetime
 
 app = FastAPI()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 pending_vends = []
+audit_log = []
 
 
 @app.get("/")
@@ -56,6 +58,12 @@ async def stripe_webhook(request: Request):
 
     if event["type"] == "checkout.session.completed":
         pending_vends.append({"status": "pending"})
+        audit_log.append({
+            "timestamp": datetime.utcnow().isoformat(),
+            "source": "online_payment",
+            "table": "Table 1",
+            "status": "completed"
+        })
 
     return {"received": True}
 
@@ -65,3 +73,20 @@ async def next_vend():
     if pending_vends:
         return pending_vends.pop(0)
     return {"status": "none"}
+
+
+@app.post("/log-manual-vend")
+async def log_manual_vend():
+    record = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "source": "manual_switch",
+        "table": "Table 1",
+        "status": "completed"
+    }
+    audit_log.append(record)
+    return {"logged": True, "record": record}
+
+
+@app.get("/audits")
+async def audits():
+    return audit_log
