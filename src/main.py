@@ -202,7 +202,13 @@ async def stripe_webhook(request: Request):
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
 
-        metadata = session.metadata if hasattr(session, "metadata") else {}
+        raw_metadata = session.metadata if hasattr(session, "metadata") else {}
+
+        if hasattr(raw_metadata, "to_dict_recursive"):
+            metadata = raw_metadata.to_dict_recursive()
+        else:
+            metadata = dict(raw_metadata) if raw_metadata else {}
+
         table_name = metadata.get("table_name", "Table 1")
 
         queue_vend(table_name)
