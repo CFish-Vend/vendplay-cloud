@@ -10,8 +10,6 @@ app = FastAPI()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-pending_vends = []
-
 
 def get_conn():
     return psycopg.connect(DATABASE_URL)
@@ -30,10 +28,19 @@ def init_db():
                     amount_cents INTEGER NOT NULL DEFAULT 0
                 )
             """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS vend_queue (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMPTZ NOT NULL,
+                    table_name TEXT NOT NULL,
+                    status TEXT NOT NULL
+                )
+            """)
         conn.commit()
 
 
-def add_audit(source: str, table: str = "Table 1", status: str = "completed", amount_cents: int = 0):
+def add_audit(source: str, table: str, status: str = "completed", amount_cents: int = 0):
     ts = datetime.now(timezone.utc)
 
     with get_conn() as conn:
@@ -56,6 +63,66 @@ def add_audit(source: str, table: str = "Table 1", status: str = "completed", am
         "table": row[3],
         "status": row[4],
         "amount_cents": row[5],
+    }
+
+
+def queue_vend(table: str):
+    ts = datetime.now(timezone.utc)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO vend_queue (timestamp, table_name, status)
+                VALUES (%s, %s, %s)
+                RETURNING id, timestamp, table_name, status
+                """,
+                (ts, table, "pending"),
+            )
+            row = cur.fetchone()
+        conn.commit()
+
+    return {
+        "id": row[0],
+        "timestamp": row[1].isoformat(),
+        "table": row[2],
+        "status": row[3],
+    }
+
+
+def get_next_vend(table: str):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, timestamp, table_name, status
+                FROM vend_queue
+                WHERE table_name = %s AND status = 'pending'
+                ORDER BY timestamp ASC
+                LIMIT 1
+                """,
+                (table,),
+            )
+            row = cur.fetchone()
+
+            if not row:
+                return None
+
+            cur.execute(
+                """
+                UPDATE vend_queue
+                SET status = 'completed'
+                WHERE id = %s
+                """,
+                (row[0],),
+            )
+        conn.commit()
+
+    return {
+        "id": row[0],
+        "timestamp": row[1].isoformat(),
+        "table": row[2],
+        "status": "pending",
     }
 
 
@@ -92,33 +159,34 @@ async def root():
     return {"status": "vendplay cloud running"}
 
 
-@app.get("/buy")
-async def buy():
+@app.get("/buy/{table_name}")
+async def buy(table_name: str):
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{
             "price_data": {
                 "currency": "cad",
-                "product_data": {"name": "Table Vend"},
+                "product_data": {"name": f"{table_name} Vend"},
                 "unit_amount": 200,
             },
             "quantity": 1,
         }],
         mode="payment",
-        success_url=os.getenv("BASE_URL") + "/success",
-        cancel_url=os.getenv("BASE_URL") + "/cancel",
+        success_url=os.getenv("BASE_URL") + f"/success?table={table_name}",
+        cancel_url=os.getenv("BASE_URL") + f"/cancel?table={table_name}",
+        metadata={"table_name": table_name},
     )
     return RedirectResponse(session.url, status_code=303)
 
 
 @app.get("/success")
-async def success():
-    return {"status": "payment success"}
+async def success(table: str | None = None):
+    return {"status": "payment success", "table": table}
 
 
 @app.get("/cancel")
-async def cancel():
-    return {"status": "payment cancelled"}
+async def cancel(table: str | None = None):
+    return {"status": "payment cancelled", "table": table}
 
 
 @app.post("/stripe/webhook")
@@ -132,10 +200,13 @@ async def stripe_webhook(request: Request):
     )
 
     if event["type"] == "checkout.session.completed":
-        pending_vends.append({"status": "pending"})
+        session = event["data"]["object"]
+        table_name = session.get("metadata", {}).get("table_name", "Table 1")
+
+        queue_vend(table_name)
         add_audit(
             source="online_payment",
-            table="Table 1",
+            table=table_name,
             status="completed",
             amount_cents=200,
         )
@@ -143,18 +214,19 @@ async def stripe_webhook(request: Request):
     return {"received": True}
 
 
-@app.get("/next-vend")
-async def next_vend():
-    if pending_vends:
-        return pending_vends.pop(0)
-    return {"status": "none"}
+@app.get("/next-vend/{table_name}")
+async def next_vend(table_name: str):
+    record = get_next_vend(table_name)
+    if record:
+        return {"status": "pending", "table": table_name}
+    return {"status": "none", "table": table_name}
 
 
-@app.post("/log-manual-vend")
-async def log_manual_vend():
+@app.post("/log-manual-vend/{table_name}")
+async def log_manual_vend(table_name: str):
     record = add_audit(
         source="manual_switch",
-        table="Table 1",
+        table=table_name,
         status="completed",
         amount_cents=200,
     )
