@@ -2,26 +2,89 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 import stripe
 import os
-from datetime import datetime
+import psycopg
+from datetime import datetime, timezone
 
 app = FastAPI()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 pending_vends = []
-audit_log = []
+
+
+def get_conn():
+    return psycopg.connect(DATABASE_URL)
+
+
+def init_db():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS audits (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMPTZ NOT NULL,
+                    source TEXT NOT NULL,
+                    table_name TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    amount_cents INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+        conn.commit()
 
 
 def add_audit(source: str, table: str = "Table 1", status: str = "completed", amount_cents: int = 0):
-    record = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "source": source,
-        "table": table,
-        "status": status,
-        "amount_cents": amount_cents,
+    ts = datetime.now(timezone.utc)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO audits (timestamp, source, table_name, status, amount_cents)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id, timestamp, source, table_name, status, amount_cents
+                """,
+                (ts, source, table, status, amount_cents),
+            )
+            row = cur.fetchone()
+        conn.commit()
+
+    return {
+        "id": row[0],
+        "timestamp": row[1].isoformat(),
+        "source": row[2],
+        "table": row[3],
+        "status": row[4],
+        "amount_cents": row[5],
     }
-    audit_log.append(record)
-    return record
+
+
+def get_all_audits():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, timestamp, source, table_name, status, amount_cents
+                FROM audits
+                ORDER BY timestamp DESC
+            """)
+            rows = cur.fetchall()
+
+    return [
+        {
+            "id": r[0],
+            "timestamp": r[1].isoformat(),
+            "source": r[2],
+            "table": r[3],
+            "status": r[4],
+            "amount_cents": r[5],
+        }
+        for r in rows
+    ]
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 
 @app.get("/")
@@ -100,35 +163,31 @@ async def log_manual_vend():
 
 @app.get("/audits")
 async def audits():
-    return audit_log
+    return get_all_audits()
 
 
 @app.get("/audits/summary")
 async def audits_summary():
-    total_count = len(audit_log)
-    total_amount_cents = sum(r.get("amount_cents", 0) for r in audit_log)
+    records = get_all_audits()
+
+    total_count = len(records)
+    total_amount_cents = sum(r.get("amount_cents", 0) for r in records)
 
     by_source = {}
     by_table = {}
 
-    for r in audit_log:
+    for r in records:
         source = r.get("source", "unknown")
         table = r.get("table", "unknown")
         amount = r.get("amount_cents", 0)
 
         if source not in by_source:
-            by_source[source] = {
-                "count": 0,
-                "amount_cents": 0,
-            }
+            by_source[source] = {"count": 0, "amount_cents": 0}
         by_source[source]["count"] += 1
         by_source[source]["amount_cents"] += amount
 
         if table not in by_table:
-            by_table[table] = {
-                "count": 0,
-                "amount_cents": 0,
-            }
+            by_table[table] = {"count": 0, "amount_cents": 0}
         by_table[table]["count"] += 1
         by_table[table]["amount_cents"] += amount
 
@@ -143,8 +202,7 @@ async def audits_summary():
 
 @app.get("/audits/table/{table_name}")
 async def audits_by_table(table_name: str):
-    records = [r for r in audit_log if r.get("table") == table_name]
-
+    records = [r for r in get_all_audits() if r.get("table") == table_name]
     total_amount_cents = sum(r.get("amount_cents", 0) for r in records)
 
     return {
