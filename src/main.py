@@ -200,8 +200,11 @@ async def stripe_webhook(request: Request):
     )
 
     if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        table_name = session.get("metadata", {}).get("table_name", "Table 1")
+	session = event["data"]["object"]
+
+	# FIX: Stripe object access
+	metadata = session.metadata if hasattr(session, "metadata") else {}
+	table_name = metadata.get("table_name", "Table 1")
 
         queue_vend(table_name)
         add_audit(
