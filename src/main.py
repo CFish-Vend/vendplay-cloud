@@ -199,18 +199,16 @@ async def stripe_webhook(request: Request):
         payload, sig_header, endpoint_secret
     )
 
-if event["type"] == "checkout.session.completed":
-    session = event["data"]["object"]
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
 
-    # SAFE metadata extraction
-    try:
-        table_name = session.metadata["table_name"]
-    except Exception:
-        table_name = "Table 1"
+        try:
+            table_name = session.metadata["table_name"]
+        except Exception:
+            table_name = "Table 1"
 
-    queue_vend(table_name)
-    add_audit(
-
+        queue_vend(table_name)
+        add_audit(
             source="online_payment",
             table=table_name,
             status="completed",
@@ -218,7 +216,6 @@ if event["type"] == "checkout.session.completed":
         )
 
     return {"received": True}
-
 
 @app.get("/next-vend/{table_name}")
 async def next_vend(table_name: str):
