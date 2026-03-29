@@ -174,7 +174,7 @@ async def buy(table_name: str):
         mode="payment",
         success_url=os.getenv("BASE_URL") + f"/success?table={table_name}",
         cancel_url=os.getenv("BASE_URL") + f"/cancel?table={table_name}",
-        metadata={"table_name": table_name},
+        metadata={"table_id": table_name},
     )
     return RedirectResponse(session.url, status_code=303)
 
@@ -203,7 +203,7 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
 
         try:
-            table_name = session.metadata.get("table_id", "tbl_001")
+            table_name = session.metadata.get["table_id"]
         except Exception:
             table_name = "tbl_001"
 
