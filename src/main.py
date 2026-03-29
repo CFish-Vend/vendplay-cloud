@@ -66,7 +66,7 @@ def add_audit(source: str, table: str, status: str = "completed", amount_cents: 
     }
 
 
-def queue_vend(table: str):
+def queue_vend(table_id: str):
     ts = datetime.now(timezone.utc)
 
     with get_conn() as conn:
@@ -77,7 +77,7 @@ def queue_vend(table: str):
                 VALUES (%s, %s, %s)
                 RETURNING id, timestamp, table_name, status
                 """,
-                (ts, table, "pending"),
+                (ts, table_id, "pending"),
             )
             row = cur.fetchone()
         conn.commit()
@@ -203,9 +203,9 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
 
         try:
-            table_name = session.metadata["table_name"]
+            table_name = session.metadata.get("table_id", "tbl_001")
         except Exception:
-            table_name = "Table 1"
+            table_name = "tbl_001"
 
         queue_vend(table_name)
         add_audit(
