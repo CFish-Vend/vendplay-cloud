@@ -7,20 +7,20 @@
 <body>
     <h1>VendPlay Dashboard</h1>
 
-    <p><strong>Total Transactions:</strong> {{ summary.total_transactions }}</p>
-    <p><strong>Total Revenue:</strong> ${{ summary.total_amount_dollars }}</p>
+    <p><strong>Total Transactions:</strong> {{ summary["total_transactions"] }}</p>
+    <p><strong>Total Revenue:</strong> ${{ summary["total_amount_dollars"] }}</p>
 
     <h2>By Table</h2>
     <ul>
-    {% for table, data in summary.by_table.items() %}
-        <li>{{ table }} — {{ data.count }} transactions — ${{ "%.2f"|format(data.amount_cents / 100) }}</li>
+    {% for table, data in summary["by_table"].items() %}
+        <li>{{ table }} — {{ data["count"] }} transactions — ${{ "%.2f"|format(data["amount_cents"] / 100) }}</li>
     {% endfor %}
     </ul>
 
     <h2>By Source</h2>
     <ul>
-    {% for source, data in summary.by_source.items() %}
-        <li>{{ source }} — {{ data.count }} transactions — ${{ "%.2f"|format(data.amount_cents / 100) }}</li>
+    {% for source, data in summary["by_source"].items() %}
+        <li>{{ source }} — {{ data["count"] }} transactions — ${{ "%.2f"|format(data["amount_cents"] / 100) }}</li>
     {% endfor %}
     </ul>
 
