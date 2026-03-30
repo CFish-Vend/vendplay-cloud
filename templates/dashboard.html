@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>VendPlay Dashboard</title>
+</head>
+<body>
+    <h1>VendPlay Dashboard</h1>
+
+    <p><strong>Total Transactions:</strong> {{ summary.total_transactions }}</p>
+    <p><strong>Total Revenue:</strong> ${{ summary.total_amount_dollars }}</p>
+
+    <h2>By Table</h2>
+    <ul>
+    {% for table, data in summary.by_table.items() %}
+        <li>{{ table }} — {{ data.count }} transactions — ${{ "%.2f"|format(data.amount_cents / 100) }}</li>
+    {% endfor %}
+    </ul>
+
+    <h2>By Source</h2>
+    <ul>
+    {% for source, data in summary.by_source.items() %}
+        <li>{{ source }} — {{ data.count }} transactions — ${{ "%.2f"|format(data.amount_cents / 100) }}</li>
+    {% endfor %}
+    </ul>
+
+    <h2>Quick Links</h2>
+    <ul>
+        <li><a href="/audits">View All Audits</a></li>
+        <li><a href="/audits/summary">View Summary JSON</a></li>
+        <li><a href="/audits/table/tbl_001">View tbl_001</a></li>
+    </ul>
+</body>
+</html>

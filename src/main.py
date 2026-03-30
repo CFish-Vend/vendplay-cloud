@@ -4,8 +4,11 @@ import stripe
 import os
 import psycopg
 from datetime import datetime, timezone
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -287,3 +290,40 @@ async def audits_by_table(table_name: str):
         "total_amount_dollars": round(total_amount_cents / 100, 2),
         "transactions": records,
     }
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    records = get_all_audits()
+
+    total_count = len(records)
+    total_amount_cents = sum(r.get("amount_cents", 0) for r in records)
+
+    by_source = {}
+    by_table = {}
+
+    for r in records:
+        source = r.get("source", "unknown")
+        table = r.get("table", "unknown")
+        amount = r.get("amount_cents", 0)
+
+        if source not in by_source:
+            by_source[source] = {"count": 0, "amount_cents": 0}
+        by_source[source]["count"] += 1
+        by_source[source]["amount_cents"] += amount
+
+        if table not in by_table:
+            by_table[table] = {"count": 0, "amount_cents": 0}
+        by_table[table]["count"] += 1
+        by_table[table]["amount_cents"] += amount
+
+    summary = {
+        "total_transactions": total_count,
+        "total_amount_cents": total_amount_cents,
+        "total_amount_dollars": round(total_amount_cents / 100, 2),
+        "by_source": by_source,
+        "by_table": by_table,
+    }
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request, "summary": summary},
+    )
