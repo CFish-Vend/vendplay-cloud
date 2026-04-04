@@ -345,3 +345,36 @@ async def dashboard(request: Request):
         "dashboard.html",
         {"summary": summary},
     )
+from fastapi.responses import RedirectResponse
+import stripe
+import os
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+@app.get("/pay/{table_id}")
+async def create_checkout_session(table_id: str):
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {
+                        "name": f"VendPlay - Table {table_id}",
+                    },
+                    "unit_amount": 200,  # $2.00
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=f"https://lionfish-app-qca5h.ondigitalocean.app/success?table_id={table_id}",
+            cancel_url=f"https://lionfish-app-qca5h.ondigitalocean.app/cancel",
+            metadata={
+                "table_id": table_id
+            }
+        )
+
+        return RedirectResponse(session.url)
+
+    except Exception as e:
+        return {"error": str(e)}
