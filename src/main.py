@@ -313,10 +313,15 @@ async def dashboard(request: Request):
         raw_table = r.get("table_id") or r.get("table") or "unknown"
         if isinstance(raw_table, dict):
             table = raw_table.get("table_id") or raw_table.get("id") or raw_table.get("name") or "unknown"
-        else:
-            table = str(raw_table)
-        amount = r.get("amount_cents", 0)
 
+        else:
+            table = str(raw_table).strip()
+
+        if table.lower() in ["table 1", "tbl_001", "tbl001"]:
+            table = "tbl_001"
+
+        amount = r.get("amount_cents", 0)
+        
         if source not in by_source:
             by_source[source] = {"count": 0, "amount_cents": 0}
         by_source[source]["count"] += 1
