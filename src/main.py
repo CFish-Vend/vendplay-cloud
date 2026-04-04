@@ -257,10 +257,15 @@ async def audits_summary():
     for r in records:
         source = r.get("source", "unknown")
         raw_table = r.get("table_id") or r.get("table") or "unknown"
+
         if isinstance(raw_table, dict):
             table = raw_table.get("table_id") or raw_table.get("id") or raw_table.get("name") or "unknown"
         else:
-            table = str(raw_table)
+            table = str(raw_table).strip()
+
+        if table.lower() in ["table 1", "tbl_001", "tbl001"]:
+            table = "tbl_001"
+
         amount = r.get("amount_cents", 0)
 
         if source not in by_source:
