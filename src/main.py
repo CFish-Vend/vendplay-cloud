@@ -264,7 +264,7 @@ async def audits_summary():
             table = str(raw_table).strip()
 
         if table.lower() in ["table 1", "tbl_001", "tbl001"]:
-            table = "tbl_001"
+            table = "Table 1"
 
         amount = r.get("amount_cents", 0)
 
@@ -318,7 +318,7 @@ async def dashboard(request: Request):
             table = str(raw_table).strip()
 
         if table.lower() in ["table 1", "tbl_001", "tbl001"]:
-            table = "tbl_001"
+            table = "Table 1"
 
         amount = r.get("amount_cents", 0)
         
