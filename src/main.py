@@ -207,6 +207,7 @@ async def stripe_webhook(request: Request):
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
+        print("STRIPE METADATA:", session.get("metadata"))
 
         try:
             table_name = session.metadata.get("table_id")
