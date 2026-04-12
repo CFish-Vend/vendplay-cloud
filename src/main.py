@@ -235,10 +235,17 @@ async def stripe_webhook(request: Request):
 @app.get("/next-vend/{table_name}")
 async def next_vend(table_name: str):
     record = get_next_vend(table_name)
-    if record:
-        return {"status": "pending", "table": table_name}
-    return {"status": "none", "table": table_name}
+    
+    if not record:
+        return {"status": "none", "table": table_name}
 
+    mark_vend_completed(record["id"])
+
+    return {
+        "status": "pending",
+        "table": table_name,
+        "vend_id": record["id"]
+    }
 
 @app.post("/log-manual-vend/{table_name}")
 async def log_manual_vend(table_name: str):
