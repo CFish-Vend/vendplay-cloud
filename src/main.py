@@ -210,9 +210,8 @@ async def stripe_webhook(request: Request):
         print("STRIPE METADATA:", session.metadata)
 
         try:
-            table_name = session.metadata.get("table_id")
+            table_name = session.metadata["table_id"]
 
-            print("STRIPE METADATA:", session.metadata)
 
             if not table_name:
                 print("ERROR: No table_id in metadata")
