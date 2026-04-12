@@ -218,6 +218,7 @@ async def stripe_webhook(request: Request):
                 return {"status": "error", "reason": "missing table_id"}   
 
             queue_vend(table_name)
+            print("QUEUED VEND FOR:", table_name)
             add_audit(
                 source="online_payment",
                 table=table_name,
