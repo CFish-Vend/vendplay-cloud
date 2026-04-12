@@ -74,7 +74,9 @@ def queue_vend(table_id: str):
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
+            cur.execute("DELETE FROM vend_queue WHERE table_name = %s", (table_id,))
+
+    	    cur.execute(
                 """
                 INSERT INTO vend_queue (timestamp, table_name, status)
                 VALUES (%s, %s, %s)
@@ -83,6 +85,7 @@ def queue_vend(table_id: str):
                 (ts, table_id, "pending"),
             )
             row = cur.fetchone()
+        
         conn.commit()
 
     return {
