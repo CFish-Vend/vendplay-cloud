@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse
 import stripe
 import os
@@ -67,6 +67,31 @@ def add_audit(source: str, table: str, status: str = "completed", amount_cents: 
         "status": row[4],
         "amount_cents": row[5],
     }
+
+@app.post("/manual-vend")
+async def manual_vend(request: Request):
+    data = await request.json()
+
+    table_id = data.get("table_id")
+
+    table_map = {
+        "tbl_001": "Table 1",
+        "tbl_002": "Table 2"
+    }
+
+    table_name = table_map.get(table_id)
+
+    if not table_name:
+        return {"error": "invalid table_id"}
+
+    add_audit(
+        source="manual",
+        table=table_name,
+        status="completed",
+        amount_cents=0
+    )
+
+    return {"status": "ok"}
 
 
 def queue_vend(table_id: str):
