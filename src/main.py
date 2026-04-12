@@ -177,7 +177,7 @@ async def buy(table_name: str):
         mode="payment",
         success_url=os.getenv("BASE_URL") + f"/success?table={table_name}",
         cancel_url=os.getenv("BASE_URL") + f"/cancel?table={table_name}",
-        metadata={"table_id": table_name},
+	metadata={"table_id": f"tbl_00{table_name[-1]}"},
     )
     return RedirectResponse(session.url, status_code=303)
 
