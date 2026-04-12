@@ -76,7 +76,7 @@ def queue_vend(table_id: str):
         with conn.cursor() as cur:
             cur.execute("DELETE FROM vend_queue WHERE table_name = %s", (table_id,))
 
-    	    cur.execute(
+            cur.execute(
                 """
                 INSERT INTO vend_queue (timestamp, table_name, status)
                 VALUES (%s, %s, %s)
@@ -180,7 +180,7 @@ async def buy(table_name: str):
         mode="payment",
         success_url=os.getenv("BASE_URL") + f"/success?table={table_name}",
         cancel_url=os.getenv("BASE_URL") + f"/cancel?table={table_name}",
-	metadata={"table_id": f"tbl_00{table_name[-1]}"},
+    metadata={"table_id": f"tbl_00{table_name[-1]}"},
     )
     return RedirectResponse(session.url, status_code=303)
 
