@@ -239,8 +239,6 @@ async def next_vend(table_name: str):
     if not record:
         return {"status": "none", "table": table_name}
 
-    mark_vend_completed(record["id"])
-
     return {
         "status": "pending",
         "table": table_name,
