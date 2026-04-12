@@ -206,17 +206,25 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
 
         try:
-            table_name = session.metadata.get["table_id"]
-        except Exception:
-            table_name = "tbl_001"
+            table_name = session.metadata.get("table_id")
 
-        queue_vend(table_name)
-        add_audit(
-            source="online_payment",
-            table=table_name,
-            status="completed",
-            amount_cents=200,
-        )
+            print("STRIPE METADATA:", session.metadata)
+
+            if not table_name:
+                print("ERROR: No table_id in metadata")
+                return {"status": "error", "reason": "missing table_id"}   
+
+            queue_vend(table_name)
+            add_audit(
+                source="online_payment",
+                table=table_name,
+                status="completed",
+                amount_cents=200,
+            )
+
+        except Exception as e:
+            print("WEBHOOK ERROR:", e)
+            return {"status": "error", "reason": str(e)}
 
     return {"received": True}
 
