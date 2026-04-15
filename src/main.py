@@ -64,6 +64,13 @@ def init_db():
             );
             """)
 
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS device_status (
+                table_id TEXT PRIMARY KEY,
+                last_seen TIMESTAMP DEFAULT NOW()
+            );
+            """)
+
             # Seed tables
             cur.execute("""
             INSERT INTO table_config (table_id, display_name, price_cents)
@@ -250,3 +257,24 @@ def manual_vend(table_id: str):
             conn.commit()
 
     return {"status": "logged"}
+
+# ======================
+# HEARTBEAT
+# ======================
+
+@app.post("/heartbeat/{table_id}")
+async def heartbeat(table_id: str):
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                INSERT INTO device_status (table_id, last_seen)
+                VALUES (%s, NOW())
+                ON CONFLICT (table_id)
+                DO UPDATE SET last_seen = NOW();
+            """, (table_id,))
+
+            conn.commit()
+
+    return {"status": "ok"}
