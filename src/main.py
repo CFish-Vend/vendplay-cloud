@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import stripe
 import os
 import psycopg2
@@ -168,7 +168,7 @@ def buy(table_id: str):
         metadata={"table_id": table_id}
     )
 
-    return {"url": session.url}
+    return RedirectResponse(session.url, status_code=303)
 
 # ======================
 # WEBHOOK
