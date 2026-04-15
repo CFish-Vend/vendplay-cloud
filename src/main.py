@@ -280,3 +280,11 @@ async def heartbeat(table_id: str):
             conn.commit()
 
     return {"status": "ok"}
+
+@app.get("/success")
+def success():
+    return {"status": "payment success"}
+
+@app.get("/cancel")
+def cancel():
+    return {"status": "payment cancelled"}
