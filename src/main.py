@@ -194,22 +194,12 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
         table_id = session["metadata"]["table_id"]
 
-        print("WEBHOOK TRIGGERED")
-        print("QUEUEING:", table_id)
+        print("WEBHOOK RECEIVED:", table_id)
 
-        queue_vend(table_id)
-
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO audits (table_id, source, amount_cents)
-                    VALUES (%s, %s, %s)
-                """, (
-                    table_id,
-                    "online_payment",
-                    session["amount_total"]
-                ))
-                conn.commit()
+        try:
+            queue_vend(table_id)
+        except Exception as e:
+            print("QUEUE ERROR:", e)
 
     return {"status": "ok"}
 
