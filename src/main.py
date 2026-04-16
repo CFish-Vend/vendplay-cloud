@@ -166,7 +166,7 @@ def buy(table_id: str):
             "quantity": 1,
         }],
         mode="payment",
-        success_url=f"{BASE_URL}/success",
+        success_url=f"{BASE_URL}/success?table_id={table_id}",
         cancel_url=f"{BASE_URL}/cancel",
         metadata={"table_id": table_id}
     )
@@ -288,7 +288,11 @@ async def heartbeat(table_id: str):
     return {"status": "ok"}
 
 @app.get("/success")
-def success():
+def success(table_id: str = None):
+    if table_id:
+        print("SUCCESS PAGE VEND:", table_id)
+        queue_vend(table_id)
+
     return {"status": "payment success"}
 
 @app.get("/cancel")
