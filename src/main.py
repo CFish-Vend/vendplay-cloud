@@ -191,6 +191,9 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
         table_id = session["metadata"]["table_id"]
 
+        print("WEBHOOK TRIGGERED")
+        print("QUEUEING:", table_id)
+
         queue_vend(table_id)
 
         with get_conn() as conn:
