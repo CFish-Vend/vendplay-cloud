@@ -197,7 +197,19 @@ async def stripe_webhook(request: Request):
         print("WEBHOOK RECEIVED:", table_id)
 
         try:
-            queue_vend(table_id)
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT id FROM vend_queue
+                        WHERE table_id = %s AND status = 'pending'
+                        LIMIT 1
+                    """, (table_id,))
+                    existing = cur.fetchone()
+
+                    if existing:
+                        print("Duplicate webhook ignored")
+                    else:
+                        queue_vend(table_id)
         except Exception as e:
             print("QUEUE ERROR:", e)
 
