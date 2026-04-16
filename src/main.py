@@ -13,6 +13,9 @@ app = FastAPI()
 # CONFIG
 # ======================
 
+WEBHOOK_PATH = "/stripe/webhook"
+NEXT_VEND_PATH = "/next-vend"
+
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 BASE_URL = os.getenv("BASE_URL")
@@ -174,7 +177,7 @@ def buy(table_id: str):
 # WEBHOOK
 # ======================
 
-@app.post("/webhook")
+@app.post(WEBHOOK_PATH)
 async def stripe_webhook(request: Request):
 
     payload = await request.body()
@@ -214,7 +217,7 @@ async def stripe_webhook(request: Request):
 # HUB POLL
 # ======================
 
-@app.get("/next-vend/{table_id}")
+@app.get(f"{NEXT_VEND_PATH}/{{table_id}}")
 def next_vend(table_id: str):
 
     vend_id = get_next_vend(table_id)
