@@ -1,0 +1,284 @@
+=== SYSTEM RULES – FREE PLAY & PAYMENTS ===
+
+- If table STATE = OPEN (free play):
+    - Online payments MUST be blocked
+    - User sees: "Currently in FREE PLAY Mode"
+    - Optional: show end time of free play
+
+- STATE (open/close) controls BOTH:
+    1. Hardware behavior (actuator)
+    2. Payment availability
+
+- Users should NEVER be able to pay when table is already open
+
+- Free play is controlled entirely by cloud schedules
+- Pi only executes open/close commands
+- ESP only enforces state
+
+----------------------------------------
+
+=== BLE ISSUE (APRIL 2026) ===
+
+- Listener caused BLE stack lockup on Raspberry Pi
+- Symptom: "device not found" during vend
+- Root cause: too many / overlapping BLE connections
+- Fix: sudo systemctl restart bluetooth
+
+RULES:
+- Core vend must NEVER depend on listener
+- Listener must NOT hold BLE connection
+- BLE connections must be short and controlled
+
+STATUS:
+- Hub 01: working (after bluetooth restart)
+- Hub 02: working
+- System: stable baseline restored
+
+----------------------------------------
+=== VENDPLAY WORKING STATE (APRIL 2026 – RESTORED) ===
+VENDPLAY – WORKING STATE (APRIL 2026)
+
+CORE SYSTEM:
+- Cloud → Hub → BLE → ESP → Actuator = WORKING
+- Stripe trigger → next-vend → hub polling = WORKING
+
+HUB CONFIG:
+- Uses .env file per hub
+- Required fields:
+    TABLE_ID
+    API_BASE_URL
+    DEVICE_ADDRESS
+
+BLE CONNECTION:
+- CURRENT: Uses DEVICE_ADDRESS (MAC)
+- Reason: BLE device name is NOT reliable / not always broadcast
+- RESULT: Direct MAC connection is stable and deterministic
+
+FUTURE IMPROVEMENT:
+- Evaluate switching to DEVICE_NAME if:
+    - ESP reliably broadcasts name
+    - Name remains consistent across reboots
+    - No scan failures occur
+- Goal: More flexible pairing system (if needed)
+
+IMPORTANT:
+- DO NOT mix MAC and NAME logic
+- DO NOT reintroduce scanning unless tested separately
+- MAC-based connection is currently the most reliable approach
+
+RUNNER.PY:
+- Uses load_dotenv with absolute path
+- BLE listener DISABLED for now
+- Uses direct connection via DEVICE_ADDRESS
+
+SYSTEMD:
+- Uses python -u (unbuffered logging)
+- Ensures logs visible in journalctl
+
+RULES (CRITICAL):
+- One change at a time
+- Always verify before modifying
+- Never refactor multiple layers at once
+- Always preserve a known working state before changes
+
+STATUS:
+- Hub 01: FULLY WORKING
+- Hub 02: TO BE RESTORED FROM HUB 01 BASELINE
+
+END
+
+=== VENDPLAY SYSTEM DOCUMENTATION ===
+
+--- OVERVIEW ---
+BLE-controlled actuator vending system with:
+- ESP32 (actuator + manual switch)
+- Raspberry Pi (BLE hub + polling)
+- DigitalOcean backend (FastAPI)
+- Stripe payments
+
+--------------------------------------------------
+
+--- ESP32 FIRMWARE ---
+Device Name:
+- VendGate-001 / VendGate-002
+
+Features:
+- BLE command receiver ("vend", "open", "close")
+- Manual switch (GPIO D2)
+- Actuator control (open/close)
+
+Manual Vend Flow:
+- Switch pressed → vendCycle(true)
+- Sends BLE notify:
+  "manual_vend"
+
+Notify UUID:
+12345678-1234-1234-1234-1234567890ac
+
+--------------------------------------------------
+
+--- RASPBERRY PI (HUB) ---
+
+Path:
+~/actuator_project
+
+Main Script:
+src/runner.py
+
+Service:
+vendplay
+
+Function:
+- Polls: /next-vend/{TABLE_ID}
+- If status == "pending" → sends BLE "vend"
+
+BLE:
+- CHAR_UUID = abcd1234-5678-1234-5678-abcdef123456
+- Command = "vend"
+
+IMPORTANT:
+- Pi DOES NOT currently listen for BLE notifications
+- Manual vend notify from ESP is NOT captured
+
+--------------------------------------------------
+--- BACKEND CODE (CONFIRMED) ---
+
+File:
+src/main.py
+
+Database Tables:
+
+audits:
+- timestamp
+- source
+- table_name
+- status
+- amount_cents
+
+vend_queue:
+- timestamp
+- table_name
+- status
+
+Audit Function:
+add_audit(source, table, status, amount_cents)
+
+Key Insight:
+- Backend does NOT use an external /audit endpoint
+- Audits are written internally using add_audit()
+
+Manual Vend Requirement:
+- Must call add_audit()
+- source = "manual"
+- table_name = "Table 1" / "Table 2"
+- amount_cents = table value (or 0 if not defined yet)
+--- BACKEND (DIGITALOCEAN) ---
+
+Flow:
+Stripe → webhook → queue → Pi → BLE → actuator
+
+Endpoints:
+
+
+/buy/tbl_001
+/buy/tbl_002
+/next-vend/{table_id}
+
+NOTE:
+- table_id (tbl_001, tbl_002) is used in URLs and backend logic
+- table_name ("Table 1", "Table 2") is for display and audits only
+
+
+----------------------------------------
+
+=== STRIPE WEBHOOK BEHAVIOR (CRITICAL) ===
+
+- Stripe may deliver the SAME webhook event multiple times
+- Delivery can be:
+    • immediate duplicate
+    • delayed (seconds or minutes later)
+
+- Each Stripe event has a unique event_id
+
+FIX IMPLEMENTED:
+- Backend stores processed event_id in processed_events table
+- Before queue_vend():
+    → check if event_id already exists
+    → if yes → IGNORE webhook
+    → if no → process and store event_id
+
+RULE:
+- queue_vend() must ONLY run once per event_id
+- NEVER rely on vend_queue state to prevent duplicates
+
+RESULT:
+- Prevents:
+    • double vend (immediate)
+    • phantom vend (delayed)
+
+----------------------------------------
+
+--------------------------------------------------
+
+--- AUDIT & REVENUE MODEL (CRITICAL) ---
+
+Two vend types:
+
+1. Online Vend
+- Source: Stripe
+- Logged from webhook
+- Must match Stripe totals
+
+2. Manual Vend
+- Source: ESP switch
+- No Stripe payment
+- Must be tracked separately
+
+Audit Requirements:
+- table_id
+- timestamp
+- vend_type (manual / online)
+- amount
+- source
+
+Goal:
+- Balance Stripe vs manual vs total vends
+- Enable payouts to table owners
+
+--------------------------------------------------
+--- BACKEND FORMAT (CRITICAL) ---
+
+Audit Function:
+add_audit(source, table_name, status, amount_cents)
+
+Table Mapping:
+- tbl_001 → "Table 1"
+- tbl_002 → "Table 2"
+
+IMPORTANT:
+- Backend uses table_name (NOT table_id)
+- Pi must convert before sending
+
+Manual Vend Requirements:
+- source = "manual"
+- table_name = "Table X"
+- status = "completed"
+- amount_cents = table price (or 0 if unknown)
+--- CURRENT SYSTEM STATE ---
+
+- Table 1 vend works
+- Table 2 vend works
+- BLE working ~20 ft
+- Manual vend triggers actuator
+- Manual vend NOT showing in Pi logs (missing notify listener)
+
+--------------------------------------------------
+
+--- NEXT STEP ---
+
+Add BLE notify listener in runner.py:
+- capture "manual_vend"
+- log it
+- send to backend audit endpoint
+
+--------------------------------------------------

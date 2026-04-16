@@ -304,11 +304,7 @@ async def heartbeat(table_id: str):
 
 @app.get("/success")
 def success(table_id: str = None):
-    if table_id:
-        print("SUCCESS PAGE VEND:", table_id)
-        queue_vend(table_id)
-
-    return {"status": "payment success"}
+    return {"status": "payment success", "table_id": table_id}
 
 @app.get("/cancel")
 def cancel():

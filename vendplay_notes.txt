@@ -1,0 +1,100 @@
+==============================
+VENDPLAY NOTES (WORKING IDEAS)
+==============================
+
+--- PRODUCT DIRECTION ---
+
+• QR code per table → instant payment → vend
+• Location + Table naming:
+  Example: "Jim's Bar_Table 01"
+
+• Expand beyond pool:
+  - Foosball
+  - Arcade
+  - Air hockey
+  - Timed access tables
+
+----------------------------------------
+
+--- USER EXPERIENCE ---
+
+• Customer flow:
+  Scan QR → Pay → Immediate vend
+
+• Requirements:
+  - Fast payment (<2 seconds)
+  - No manual input
+  - No confusion on table selection
+
+• Free Play Mode:
+  - Controlled by schedule (cloud)
+  - Blocks payment when active
+  - Displays "Free Play" to user
+
+----------------------------------------
+
+--- BUSINESS MODEL ---
+
+• Revenue split:
+  - Owner payout vs platform fee
+
+• Track:
+  - Online vends (Stripe)
+  - Manual vends (ESP switch)
+
+• Goal:
+  Reconcile:
+  - Stripe revenue
+  - Total vends
+  - Manual usage
+
+----------------------------------------
+
+--- FUTURE FEATURES ---
+
+• Multi-location support
+• Multi-table per account
+• Dashboard:
+  - Revenue
+  - Vend counts
+  - Usage by table
+
+• Promotions:
+  - Free vend codes
+  - Scheduled free play
+  - Happy hour pricing
+
+----------------------------------------
+
+--- HARDWARE IDEAS ---
+
+• Battery-powered actuator (no Pi)
+• WiFi ESP version (no hub)
+• Dry contact systems for arcade machines
+
+----------------------------------------
+
+--- KNOWN RISKS / LESSONS ---
+
+• DO NOT overcomplicate early
+• One change at a time
+• Always preserve working state before changes
+
+----------------------------------------
+
+--- OPEN QUESTIONS ---
+
+• Best payment flow for < $2 transactions?
+• Can we remove Pi in future?
+• How to onboard new locations easily?
+
+----------------------------------------
+----------------------------------------
+LESSONS LEARNED (APRIL 2026)
+----------------------------------------
+
+• Stripe webhooks can be delivered multiple times (including delayed retries)
+• Duplicate protection MUST use event_id (not queue state)
+• “Pending” checks do NOT prevent delayed duplicates
+• Always verify actual system behavior before adding fixes
+• One change at a time — avoid layered fixes without confirmation
