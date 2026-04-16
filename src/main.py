@@ -85,6 +85,12 @@ def init_db():
             ON CONFLICT (table_id) DO NOTHING;
             """)
 
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS processed_events (
+                event_id TEXT PRIMARY KEY
+            );
+            """)
+
             conn.commit()
 
 init_db()
@@ -187,6 +193,7 @@ async def stripe_webhook(request: Request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, STRIPE_WEBHOOK_SECRET
         )
+            event_id = event["id"]
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
@@ -194,21 +201,27 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
         table_id = session["metadata"]["table_id"]
 
-        print("WEBHOOK RECEIVED:", table_id)
+        print("WEBHOOK RECEIVED:", table_id, event_id)
 
         try:
             with get_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT id FROM vend_queue
-                        WHERE table_id = %s AND status = 'pending'
+                        SELECT event_id FROM processed_events
+                        WHERE event_id = %s
                         LIMIT 1
-                    """, (table_id,))
+                    """, (event_id,))
                     existing = cur.fetchone()
 
                     if existing:
-                        print("Duplicate webhook ignored")
+                        print("Duplicate Stripe event ignored")
                     else:
+                        cur.execute("""
+                            INSERT INTO processed_events (event_id)
+                            VALUES (%s)
+                        """, (event_id,))
+                        conn.commit()
+
                         queue_vend(table_id)
         except Exception as e:
             print("QUEUE ERROR:", e)
