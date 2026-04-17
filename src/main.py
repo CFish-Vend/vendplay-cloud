@@ -193,7 +193,7 @@ async def stripe_webhook(request: Request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, STRIPE_WEBHOOK_SECRET
         )
-            event_id = event["id"]
+        event_id = event["id"]
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
